@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alarme - Dashboard</title>
+
+  <link rel="stylesheet" href="dashboard.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div class="brand-text">
+        <div class="title">Dashboard Alarme</div>
+        <div class="subtitle" id="systemSubtitle">Système : en chargement…</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <span class="chip" id="chipState">…</span>
+      <button class="btn btn-ghost" id="btnLogout">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="grid">
+      <!-- ÉTAT / ARMEMENT -->
+      <div class="card">
+        <h2>État du système</h2>
+        <p class="muted">
+          Active/désactive le mode surveillance. Quand c’est armé, un accès non autorisé déclenche l’alarme.
+        </p>
+
+        <div class="state-box">
+          <div class="state-row">
+            <div>
+              <div class="label">Mode</div>
+              <div class="value" id="alarmModeText">…</div>
+            </div>
+
+            <label class="switch">
+              <input type="checkbox" id="alarmToggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="mini-grid">
+            <div class="kpi">
+              <div class="kpi-label">Horaires actifs</div>
+              <div class="kpi-value" id="kpiSchedule">…</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Badges autorisés</div>
+              <div class="kpi-value" id="kpiBadges">…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="btnRefresh">Actualiser</button>
+          <button class="btn btn-danger" id="btnTestSiren">Test alarme (5s)</button>
+        </div>
+
+        <p class="hint" id="hintBox"></p>
+      </div>
+
+      <!-- HORAIRES -->
+      <div class="card">
+        <h2>Plages horaires d’armement</h2>
+        <p class="muted">
+          Définit quand la surveillance est active (ex: 21:00 → 07:00). Tu peux mettre plusieurs plages.
+        </p>
+
+        <div class="schedule">
+          <div class="schedule-head">
+            <div class="label">Plages</div>
+            <button class="btn btn-ghost" id="btnAddSlot">+ Ajouter</button>
+          </div>
+
+          <div id="slotList" class="slot-list"></div>
+
+          <div class="actions">
+            <button class="btn" id="btnSaveSchedule">Enregistrer horaires</button>
+          </div>
+
+          <p class="hint muted">
+            Tip : tu peux faire “surveillance de nuit” avec 21:00→07:00 (ça traverse minuit, c’est normal).
+          </p>
+        </div>
+      </div>
+
+      <!-- RFID -->
+      <div class="card wide">
+        <h2>Gestion des cartes RFID</h2>
+        <p class="muted">
+          Ajoute/supprime des badges. Un badge actif peut ouvrir la porte et armer/désarmer selon ton système.
+        </p>
+
+        <div class="rfid-toolbar">
+          <div class="input-inline">
+            <div class="input-group">
+              <label for="rfidUid">UID RFID</label>
+              <input id="rfidUid" type="text" placeholder="Ex: 04A1B2C3D4" />
+            </div>
+
+            <div class="input-group">
+              <label for="rfidOwner">Propriétaire</label>
+              <input id="rfidOwner" type="text" placeholder="Ex: Arthur Dupont" />
+            </div>
+          </div>
+
+          <button class="btn" id="btnAddBadge">Ajouter</button>
+        </div>
+
+        <div class="table">
+          <div class="t-head">
+            <div>UID</div>
+            <div>Propriétaire</div>
+            <div>Statut</div>
+            <div class="t-right">Actions</div>
+          </div>
+          <div id="badgeList" class="t-body"></div>
+        </div>
+
+        <p class="hint muted">
+          Si tu as un lecteur RFID USB côté “responsable”, tu peux aussi auto-remplir l’UID côté app C++,
+          mais ici on garde une interface web simple.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="dashboard.js"></script>
+</body>
+</html>
