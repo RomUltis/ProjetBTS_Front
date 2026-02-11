@@ -29,6 +29,7 @@
 
   <div class="container">
     <div class="grid">
+
       <!-- ÉTAT / ARMEMENT -->
       <div class="card">
         <h2>État du système</h2>
@@ -96,6 +97,32 @@
         </div>
       </div>
 
+      <!-- CAMÉRA (DANS LA GRID, PAS EN DEHORS) -->
+      <div class="card wide">
+        <h2>Caméra (Dahua)</h2>
+        <p class="muted">
+          Flux live via le serveur (identifiants caméra jamais exposés au navigateur).
+        </p>
+
+        <div class="cam-wrap">
+          <video id="camVideo" autoplay playsinline muted controls></video>
+
+          <div class="cam-overlay" id="camOverlay">
+            <div class="cam-status" id="camStatus">Caméra prête</div>
+            <div class="cam-actions">
+              <button class="btn" id="btnCamStart">Afficher</button>
+              <button class="btn btn-ghost" id="btnCamStop">Couper</button>
+              <button class="btn btn-ghost" id="btnCamSub">Sous-flux</button>
+              <button class="btn btn-ghost" id="btnCamMain">Flux principal</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="hint muted">
+          Le flux principal est décalé dû au fait qu'il est plus lourd. Le sous-flux est plus léger donc il y a quasiment aucune latence.
+        </p>
+      </div>
+
       <!-- RFID -->
       <div class="card wide">
         <h2>Gestion des cartes RFID</h2>
@@ -112,7 +139,7 @@
 
             <div class="input-group">
               <label for="rfidOwner">Propriétaire</label>
-              <input id="rfidOwner" type="text" placeholder="Ex: Arthur Dupont" />
+              <input id="rfidOwner" type="text" placeholder="Ex: Romain Ultis" />
             </div>
           </div>
 
@@ -130,14 +157,18 @@
         </div>
 
         <p class="hint muted">
-          Si tu as un lecteur RFID USB côté “responsable”, tu peux aussi auto-remplir l’UID côté app C++,
-          mais ici on garde une interface web simple.
+          Astuce : pour un dashboard fluide, garde le sous-flux caméra et limite la résolution si besoin.
         </p>
       </div>
+
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- HLS (pour lire /cam/live.m3u8 sur Chrome/Edge/Firefox) -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
   <script src="dashboard.js"></script>
 </body>
 </html>

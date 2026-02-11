@@ -31,6 +31,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const badgeList = document.getElementById("badgeList");
 
   const toast = document.getElementById("toast");
+  const camVideo = document.getElementById("camVideo");
+  const camStatus = document.getElementById("camStatus");
+  const btnCamStart = document.getElementById("btnCamStart");
+  const btnCamStop = document.getElementById("btnCamStop");
+  const btnCamSub = document.getElementById("btnCamSub");
+  const btnCamMain = document.getElementById("btnCamMain");
 
   // State
   let scheduleSlots = [];
@@ -346,6 +352,86 @@ document.addEventListener("DOMContentLoaded", () => {
       setHint(e.message, true);
     }
   });
+  let hls = null;
+  let camIsPlaying = false;
+  let currentCamUrl = "/cam/sub/live.m3u8";
+
+function camSetStatus(msg) {
+  camStatus.textContent = msg;
+}
+
+function startCam() {
+  camSetStatus("Connexion caméra…");
+
+  if (window.Hls && Hls.isSupported()) {
+    if (hls) {
+      hls.destroy();
+      hls = null;
+    }
+
+    hls = new Hls({
+      lowLatencyMode: true,
+      liveSyncDurationCount: 2,
+      maxLiveSyncPlaybackRate: 1.5,
+      maxBufferLength: 2,
+      backBufferLength: 0
+    });
+
+    hls.loadSource(currentCamUrl);
+    hls.attachMedia(camVideo);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      camVideo.play().catch(() => {});
+      camSetStatus("Caméra en live");
+      camIsPlaying = true;
+    });
+
+    hls.on(Hls.Events.ERROR, () => {
+      camSetStatus("Erreur flux caméra");
+    });
+
+  } else {
+    // Safari
+    camVideo.src = currentCamUrl;
+    camVideo.play().catch(() => {});
+    camIsPlaying = true;
+    camSetStatus("Caméra en live");
+  }
+}
+
+function stopCam() {
+  if (hls) {
+    hls.destroy();
+    hls = null;
+  }
+  camVideo.pause();
+  camVideo.removeAttribute("src");
+  camVideo.load();
+  camIsPlaying = false;
+  camSetStatus("Caméra coupée");
+}
+
+btnCamStart.addEventListener("click", startCam);
+btnCamStop.addEventListener("click", stopCam);
+
+// Optionnel : tes boutons sub/main (ils changent juste le texte)
+btnCamSub.addEventListener("click", () => {
+  currentCamUrl = "/cam/sub/live.m3u8";
+  camSetStatus("Sous-flux sélectionné");
+  if (camIsPlaying) {
+    stopCam();
+    startCam();
+  }
+});
+
+btnCamMain.addEventListener("click", () => {
+  currentCamUrl = "/cam/main/live.m3u8";
+  camSetStatus("Flux principal sélectionné");
+  if (camIsPlaying) {
+    stopCam();
+    startCam();
+  }
+});
 
   // Boot
   loadAll().catch(e => setHint(e.message, true));
