@@ -29,6 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const badgeList = document.getElementById("badgeList");
 
   const toast = document.getElementById("toast");
+
+  // Caméra
   const camVideo = document.getElementById("camVideo");
   const camStatus = document.getElementById("camStatus");
   const btnCamStart = document.getElementById("btnCamStart");
@@ -36,34 +38,64 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCamSub = document.getElementById("btnCamSub");
   const btnCamMain = document.getElementById("btnCamMain");
 
+  // Modal test relais
+  const relayModal = document.getElementById("relayModal");
+  const relayModalClose = document.getElementById("relayModalClose");
+  const relayList = document.getElementById("relayList");
+  const relaySelectAll = document.getElementById("relaySelectAll");
+  const relayUnselectAll = document.getElementById("relayUnselectAll");
+  const relayRunTest = document.getElementById("relayRunTest");
+
+  // ---- State ----
   let scheduleSlots = [];
   let badges = [];
   let isArmed = false;
 
+  // Mapping relais
+  const RELAYS = [
+    { ch: 0, label: "Relais 0 (pin 3-4)", zone: "Labo CIEL 1", role: "Gâche" },
+    { ch: 1, label: "Relais 1 (pin 5-6)", zone: "Labo CIEL 1", role: "Flash" },
+    { ch: 2, label: "Relais 2 (pin 7-8)", zone: "Labo CIEL 1", role: "Sirène" },
+
+    { ch: 3, label: "Relais 3 (pin 9-10)", zone: "Labo CIEL 2", role: "Flash" },
+    { ch: 4, label: "Relais 4 (pin 11-12)", zone: "Labo CIEL 2", role: "Sirène" },
+
+    { ch: 5, label: "Relais 5 (pin 1-2)", zone: "Labo Serveur / Physique", role: "Flash" },
+    { ch: 6, label: "Relais 6 (pin 3-4)", zone: "Labo Serveur / Physique", role: "Sirène" },
+    // { ch: 7, label: "Relais 7 (...)", zone: "...", role: "..." },
+  ];
+
+  // Helpers UI
   function showToast(msg) {
+    if (!toast) return;
     toast.textContent = msg;
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), 2400);
   }
 
   function setHint(msg, isError = false) {
+    if (!hintBox) return;
     hintBox.textContent = msg || "";
     hintBox.style.color = isError ? "#c0392b" : "rgba(0,0,0,0.72)";
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // API helper
   async function api(path, options = {}) {
     const headers = options.headers || {};
     headers["Authorization"] = `Bearer ${token}`;
-    if (options.json) {
-      headers["Content-Type"] = "application/json";
-    }
+    if (options.json) headers["Content-Type"] = "application/json";
 
-    const res = await fetch(`${API_URL}${path}`, {
-      ...options,
-      headers
-    });
+    const res = await fetch(`${API_URL}${path}`, { ...options, headers });
 
-    // Gestion token expiré
     if (res.status === 401) {
       localStorage.removeItem("token");
       window.location.href = "index.html#login";
@@ -81,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return data;
   }
 
-  // Render schedule
+  // Schedule render
   function renderSchedule() {
     slotList.innerHTML = "";
 
@@ -106,7 +138,6 @@ document.addEventListener("DOMContentLoaded", () => {
           <button class="btn btn-ghost small-btn" data-del="${idx}">Supprimer</button>
         </div>
       `;
-
       slotList.appendChild(row);
     });
 
@@ -127,7 +158,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Render badges
+  // Badges render
   function renderBadges() {
     badgeList.innerHTML = "";
 
@@ -188,16 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function escapeHtml(str) {
-    return String(str)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-  // UI state
+  // UI State
   function updateUiState() {
     alarmToggle.checked = !!isArmed;
 
@@ -216,18 +238,12 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadAll() {
     setHint("");
 
-    // 1) état alarme
-    // attendu: { armed: true/false }
     const status = await api("/alarm/status", { method: "GET" });
     if (status) isArmed = !!status.armed;
 
-    // 2) horaires
-    // attendu: { slots: [{start:"21:00", end:"07:00"}, ...] }
     const sched = await api("/schedule", { method: "GET" });
     scheduleSlots = (sched && sched.slots) ? sched.slots : [];
 
-    // 3) badges rfid
-    // attendu: { badges: [{id, uid, owner, enabled}, ...] }
     const r = await api("/rfid", { method: "GET" });
     badges = (r && r.badges) ? r.badges : [];
 
@@ -236,7 +252,94 @@ document.addEventListener("DOMContentLoaded", () => {
     updateUiState();
   }
 
-  // Events
+  // Modal Test Relais
+  function modalExists() {
+    return !!(relayModal && relayList && relayRunTest && relaySelectAll && relayUnselectAll && relayModalClose);
+  }
+
+  function openRelayModal() {
+    if (!modalExists()) return false;
+
+    relayList.innerHTML = "";
+    RELAYS.forEach(r => {
+      const row = document.createElement("div");
+      row.className = "relay-item";
+      row.innerHTML = `
+        <label style="display:flex;gap:10px;align-items:center;justify-content:space-between;width:100%;">
+          <span style="display:flex;gap:10px;align-items:center;">
+            <input type="checkbox" class="relay-check" data-ch="${r.ch}" checked>
+            <span>
+              <strong>${r.label}</strong><br>
+              <span style="opacity:.75">${r.zone}</span>
+            </span>
+          </span>
+          <span class="tag">${r.role}</span>
+        </label>
+      `;
+      relayList.appendChild(row);
+    });
+
+    relayModal.classList.remove("hidden");
+    return true;
+  }
+
+  function closeRelayModal() {
+    if (!relayModal) return;
+    relayModal.classList.add("hidden");
+  }
+
+  // Bind modal buttons once
+  if (relayModal) {
+    relayModal.addEventListener("click", (e) => {
+      if (e.target === relayModal) closeRelayModal();
+    });
+  }
+  if (relayModalClose) relayModalClose.addEventListener("click", closeRelayModal);
+
+  if (relaySelectAll) {
+    relaySelectAll.addEventListener("click", () => {
+      relayList?.querySelectorAll(".relay-check").forEach(cb => cb.checked = true);
+    });
+  }
+  if (relayUnselectAll) {
+    relayUnselectAll.addEventListener("click", () => {
+      relayList?.querySelectorAll(".relay-check").forEach(cb => cb.checked = false);
+    });
+  }
+
+  if (relayRunTest) {
+    relayRunTest.addEventListener("click", async () => {
+      try {
+        const selected = [...relayList.querySelectorAll(".relay-check")]
+          .filter(cb => cb.checked)
+          .map(cb => Number(cb.dataset.ch));
+
+        if (!selected.length) {
+          setHint("Tu dois cocher au moins un relais.", true);
+          return;
+        }
+
+        relayRunTest.disabled = true;
+        setHint("Test en cours (1s par relais)…");
+
+        const j = await api("/api/pet/do/test-selected", {
+          method: "POST",
+          json: true,
+          body: JSON.stringify({ channels: selected, ms: 1000, delay: 1200 })
+        });
+
+        if (!j || !j.ok) throw new Error(j?.error || "Erreur test");
+        closeRelayModal();
+        setHint("Test lancé");
+      } catch (e) {
+        setHint("Erreur test : " + (e.message || e), true);
+      } finally {
+        relayRunTest.disabled = false;
+      }
+    });
+  }
+
+  // ---- Events ----
   btnLogout.addEventListener("click", () => {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
@@ -257,7 +360,6 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const desired = alarmToggle.checked;
 
-      // POST /alarm/toggle { armed: true/false }
       await api("/alarm/toggle", {
         method: "POST",
         json: true,
@@ -268,20 +370,21 @@ document.addEventListener("DOMContentLoaded", () => {
       updateUiState();
       showToast(desired ? "Alarme armée" : "Alarme désarmée");
     } catch (e) {
-      // rollback
       alarmToggle.checked = !alarmToggle.checked;
       setHint(e.message, true);
     }
   });
 
   btnTestSiren.addEventListener("click", async () => {
+    const opened = openRelayModal();
+    if (opened) return;
     try {
       btnTestSiren.disabled = true;
-      setHint("Test des relais (1s chacun)…");
+      setHint("Modal absent -> test relais complet (fallback)…");
 
-      // IMPORTANT: on passe par ton helper api() pour que le token parte
       const j = await api("/api/pet/do/test-all", {
         method: "POST",
+        json: true,
         body: JSON.stringify({ ms: 1000, delay: 1200 })
       });
 
@@ -302,7 +405,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnSaveSchedule.addEventListener("click", async () => {
     try {
-      // PUT /schedule { slots: [...] }
       await api("/schedule", {
         method: "PUT",
         json: true,
@@ -325,7 +427,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      // POST /rfid { uid, owner, enabled:true }
       await api("/rfid", {
         method: "POST",
         json: true,
@@ -340,83 +441,80 @@ document.addEventListener("DOMContentLoaded", () => {
       setHint(e.message, true);
     }
   });
+
+  // Caméra
   let hls = null;
   let camIsPlaying = false;
   let currentCamUrl = "/cam/sub/live.m3u8";
 
-function camSetStatus(msg) {
-  camStatus.textContent = msg;
-}
+  function camSetStatus(msg) {
+    camStatus.textContent = msg;
+  }
 
-function startCam() {
-  camSetStatus("Connexion caméra…");
+  function startCam() {
+    camSetStatus("Connexion caméra…");
 
-  if (window.Hls && Hls.isSupported()) {
+    if (window.Hls && Hls.isSupported()) {
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+
+      hls = new Hls({
+        lowLatencyMode: true,
+        liveSyncDurationCount: 2,
+        maxLiveSyncPlaybackRate: 1.5,
+        maxBufferLength: 2,
+        backBufferLength: 0
+      });
+
+      hls.loadSource(currentCamUrl);
+      hls.attachMedia(camVideo);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        camVideo.play().catch(() => {});
+        camSetStatus("Caméra en live");
+        camIsPlaying = true;
+      });
+
+      hls.on(Hls.Events.ERROR, () => {
+        camSetStatus("Erreur flux caméra");
+      });
+
+    } else {
+      camVideo.src = currentCamUrl;
+      camVideo.play().catch(() => {});
+      camIsPlaying = true;
+      camSetStatus("Caméra en live");
+    }
+  }
+
+  function stopCam() {
     if (hls) {
       hls.destroy();
       hls = null;
     }
-
-    hls = new Hls({
-      lowLatencyMode: true,
-      liveSyncDurationCount: 2,
-      maxLiveSyncPlaybackRate: 1.5,
-      maxBufferLength: 2,
-      backBufferLength: 0
-    });
-
-    hls.loadSource(currentCamUrl);
-    hls.attachMedia(camVideo);
-
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      camVideo.play().catch(() => {});
-      camSetStatus("Caméra en live");
-      camIsPlaying = true;
-    });
-
-    hls.on(Hls.Events.ERROR, () => {
-      camSetStatus("Erreur flux caméra");
-    });
-
-  } else {
-    camVideo.src = currentCamUrl;
-    camVideo.play().catch(() => {});
-    camIsPlaying = true;
-    camSetStatus("Caméra en live");
+    camVideo.pause();
+    camVideo.removeAttribute("src");
+    camVideo.load();
+    camIsPlaying = false;
+    camSetStatus("Caméra coupée");
   }
-}
 
-function stopCam() {
-  if (hls) {
-    hls.destroy();
-    hls = null;
-  }
-  camVideo.pause();
-  camVideo.removeAttribute("src");
-  camVideo.load();
-  camIsPlaying = false;
-  camSetStatus("Caméra coupée");
-}
+  btnCamStart.addEventListener("click", startCam);
+  btnCamStop.addEventListener("click", stopCam);
 
-btnCamStart.addEventListener("click", startCam);
-btnCamStop.addEventListener("click", stopCam);
-btnCamSub.addEventListener("click", () => {
-  currentCamUrl = "/cam/sub/live.m3u8";
-  camSetStatus("Sous-flux sélectionné");
-  if (camIsPlaying) {
-    stopCam();
-    startCam();
-  }
-});
+  btnCamSub.addEventListener("click", () => {
+    currentCamUrl = "/cam/sub/live.m3u8";
+    camSetStatus("Sous-flux sélectionné");
+    if (camIsPlaying) { stopCam(); startCam(); }
+  });
 
-btnCamMain.addEventListener("click", () => {
-  currentCamUrl = "/cam/main/live.m3u8";
-  camSetStatus("Flux principal sélectionné");
-  if (camIsPlaying) {
-    stopCam();
-    startCam();
-  }
-});
+  btnCamMain.addEventListener("click", () => {
+    currentCamUrl = "/cam/main/live.m3u8";
+    camSetStatus("Flux principal sélectionné");
+    if (camIsPlaying) { stopCam(); startCam(); }
+  });
 
   loadAll().catch(e => setHint(e.message, true));
 });

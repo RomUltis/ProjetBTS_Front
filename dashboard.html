@@ -164,6 +164,28 @@
     </div>
   </div>
 
+  <div id="relayModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="relayModalTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="relayModalTitle">Test des relais</h2>
+        <button id="relayModalClose" class="icon-btn" aria-label="Fermer">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="muted">Décoche ce que tu ne veux pas tester. Impulsion : 1 seconde par relais.</p>
+
+        <div id="relayList" class="relay-list"></div>
+
+        <div class="modal-actions">
+          <button id="relaySelectAll" class="btn btn-ghost small-btn">Tout cocher</button>
+          <button id="relayUnselectAll" class="btn btn-ghost small-btn">Tout décocher</button>
+          <div class="spacer"></div>
+          <button id="relayRunTest" class="btn btn-danger">Lancer le test</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <!-- HLS (pour lire /cam/live.m3u8 sur Chrome/Edge/Firefox) -->

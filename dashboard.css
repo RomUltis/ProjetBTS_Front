@@ -438,3 +438,68 @@ h2{
   gap:8px;
   flex-wrap:wrap;
 }
+
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.65);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+.modal-overlay.hidden{ display:none; }
+
+.modal{
+  width:min(720px, 92vw);
+  background:#fff;
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;
+  box-shadow:0 10px 40px rgba(0,0,0,.35);
+  overflow:hidden;
+}
+.modal-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 14px;
+  border-bottom:1px solid rgba(0,0,0,.08);
+}
+.modal-body{ padding:14px; }
+
+.icon-btn{
+  background:rgba(255,255,255,0.85);
+  border:1px solid rgba(0,0,0,0.10);
+  border-radius:10px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+
+.relay-list{
+  margin-top:12px;
+  display:grid;
+  gap:10px;
+}
+.relay-item{
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,0.08);
+  background:rgba(0,0,0,0.02);
+}
+
+.tag{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:600;
+  font-size:12px;
+  background:rgba(0,0,0,0.06);
+}
+
+.modal-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:14px;
+}
+.spacer{ flex:1; }
