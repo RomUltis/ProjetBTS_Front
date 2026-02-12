@@ -1,6 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Reprend ton pattern : API sur :3002 (proxy)
-  const API_URL = "http://172.29.16.152:3002"; // adapte si besoin :contentReference[oaicite:4]{index=4}
+  const API_URL = "http://172.29.16.152:3002";
 
   const token = localStorage.getItem("token");
   if (!token) {
@@ -8,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  // UI refs
   const systemSubtitle = document.getElementById("systemSubtitle");
   const chipState = document.getElementById("chipState");
   const alarmToggle = document.getElementById("alarmToggle");
@@ -38,12 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCamSub = document.getElementById("btnCamSub");
   const btnCamMain = document.getElementById("btnCamMain");
 
-  // State
   let scheduleSlots = [];
   let badges = [];
   let isArmed = false;
 
-  // Helpers
   function showToast(msg) {
     toast.textContent = msg;
     toast.classList.add("show");
@@ -161,8 +157,6 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.addEventListener("click", async () => {
         const idx = Number(btn.getAttribute("data-toggle"));
         try {
-          // Endpoint à adapter côté back :
-          // PATCH /rfid/:id { enabled: true/false }
           await api(`/rfid/${encodeURIComponent(badges[idx].id || badges[idx].uid)}`, {
             method: "PATCH",
             json: true,
@@ -182,7 +176,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!confirm("Supprimer ce badge ?")) return;
 
         try {
-          // DELETE /rfid/:id
           await api(`/rfid/${encodeURIComponent(badges[idx].id || badges[idx].uid)}`, {
             method: "DELETE"
           });
@@ -220,7 +213,6 @@ document.addEventListener("DOMContentLoaded", () => {
     systemSubtitle.textContent = `IP API : ${API_URL}`;
   }
 
-  // Loaders (endpoints à adapter à ton back)
   async function loadAll() {
     setHint("");
 
@@ -285,24 +277,20 @@ document.addEventListener("DOMContentLoaded", () => {
   btnTestSiren.addEventListener("click", async () => {
     try {
       btnTestSiren.disabled = true;
-      btnTestSiren.textContent = "Test en cours…";
+      setHint("Test des relais (1s chacun)…");
 
-      // POST /alarm/test { duration: 5 }
-      await api("/alarm/test", {
+      // IMPORTANT: on passe par ton helper api() pour que le token parte
+      const j = await api("/api/pet/do/test-all", {
         method: "POST",
-        json: true,
-        body: JSON.stringify({ duration: 5 })
+        body: JSON.stringify({ ms: 1000, delay: 1200 })
       });
 
-      showToast("Test alarme lancé (5s)");
-      setTimeout(() => {
-        btnTestSiren.disabled = false;
-        btnTestSiren.textContent = "Test alarme (5s)";
-      }, 5200);
+      if (!j || !j.ok) throw new Error(j?.error || "Erreur test relais");
+      setHint("Test lancé (DO0 → DO7)");
     } catch (e) {
-      btnTestSiren.disabled = false;
-      btnTestSiren.textContent = "Test alarme (5s)";
-      setHint(e.message, true);
+      setHint("Erreur test relais : " + (e.message || e), true);
+    } finally {
+      setTimeout(() => (btnTestSiren.disabled = false), 1000);
     }
   });
 
@@ -391,7 +379,6 @@ function startCam() {
     });
 
   } else {
-    // Safari
     camVideo.src = currentCamUrl;
     camVideo.play().catch(() => {});
     camIsPlaying = true;
@@ -413,8 +400,6 @@ function stopCam() {
 
 btnCamStart.addEventListener("click", startCam);
 btnCamStop.addEventListener("click", stopCam);
-
-// Optionnel : tes boutons sub/main (ils changent juste le texte)
 btnCamSub.addEventListener("click", () => {
   currentCamUrl = "/cam/sub/live.m3u8";
   camSetStatus("Sous-flux sélectionné");
@@ -433,6 +418,5 @@ btnCamMain.addEventListener("click", () => {
   }
 });
 
-  // Boot
   loadAll().catch(e => setHint(e.message, true));
 });
