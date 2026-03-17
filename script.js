@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const API_URL = "http://172.29.16.152:3002";
+    const API_URL = "http://172.29.19.193:3002";
 
     const loginCard = document.querySelector(".login-card");
     const registerCard = document.querySelector(".register-card");

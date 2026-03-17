@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API_URL = "http://172.29.16.152:3002";
+  const API_URL = "http://172.29.19.193:3002";
 
   const token = localStorage.getItem("token");
   if (!token) {
@@ -462,10 +462,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       hls = new Hls({
         lowLatencyMode: true,
-        liveSyncDurationCount: 2,
-        maxLiveSyncPlaybackRate: 1.5,
-        maxBufferLength: 2,
-        backBufferLength: 0
+        liveSyncDuration: 1,
+        liveMaxLatencyDuration: 2,
+        maxBufferLength: 1,
+        maxMaxBufferLength: 2,
+        backBufferLength: 0,
+        enableWorker: true
       });
 
       hls.loadSource(currentCamUrl);
@@ -475,6 +477,14 @@ document.addEventListener("DOMContentLoaded", () => {
         camVideo.play().catch(() => {});
         camSetStatus("Caméra en live");
         camIsPlaying = true;
+        camVideo.addEventListener("timeupdate", () => {
+          if (hls && hls.liveSyncPosition) {
+            const delta = camVideo.currentTime - hls.liveSyncPosition;
+            if (delta > 2) {
+              camVideo.currentTime = hls.liveSyncPosition;
+            }
+          }
+        });
       });
 
       hls.on(Hls.Events.ERROR, () => {

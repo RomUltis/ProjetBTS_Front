@@ -7,10 +7,10 @@ app.use(express.json());
 
 const corsOptions = {
   origin: [
-    "http://172.29.16.152",
-    "http://172.29.16.152:3000",
-    "http://172.29.16.152:3001",
-    "http://172.29.16.152:3002",
+    "http://172.29.19.193",
+    "http://172.29.19.193:3000",
+    "http://172.29.19.193:3001",
+    "http://172.29.19.193:3002",
   ],
   methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization",
@@ -19,7 +19,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://172.29.16.152:3001";
+const BACKEND_URL = process.env.BACKEND_URL || "http://172.29.19.193:3001";
 const PORT = Number(process.env.PORT || 3002);
 
 // Proxy pour l'inscription
