@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
     { ch: 2, label: "Relais 2 (pin 7-8)", zone: "ciel1", zoneName: "Labo CIEL 1", role: "Sirène" },
     { ch: 3, label: "Relais 3 (pin 9-10)", zone: "ciel2", zoneName: "Labo CIEL 2", role: "Flash" },
     { ch: 4, label: "Relais 4 (pin 11-12)", zone: "ciel2", zoneName: "Labo CIEL 2", role: "Sirène" },
-    { ch: 5, label: "Relais 5 (pin 1-2)", zone: "physique", zoneName: "Labo Serveur / Physique", role: "Flash" },
+    { ch: 7, label: "Relais 7 (pin 5-6)", zone: "physique", zoneName: "Labo Serveur / Physique", role: "Flash" },
     { ch: 6, label: "Relais 6 (pin 3-4)", zone: "physique", zoneName: "Labo Serveur / Physique", role: "Sirène" },
   ];
 
@@ -260,6 +260,20 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
+    // Vérifier si des portes sont ouvertes dans les zones armées (bloque l'armement)
+    const openDoorsInArmedZones = diInputs.filter(di => {
+      if (di.type !== "porte" || !di.value) return false;
+      const diZones = di.zone.split(",").map(z => z.trim());
+      return diZones.some(z => alarmConfig.armed_zones.includes(z));
+    });
+
+    if (openDoorsInArmedZones.length > 0 && !isArmed) {
+      const warning = document.createElement("div");
+      warning.className = "di-warning";
+      warning.innerHTML = `⚠️ <strong>Armement impossible</strong> — porte(s)/fenêtre(s) ouverte(s) : ${openDoorsInArmedZones.map(d => escapeHtml(d.label)).join(", ")}`;
+      diStatusContainer.appendChild(warning);
+    }
+
     Object.entries(byZone).forEach(([zoneKey, inputs]) => {
       const zoneName = ZONES[zoneKey] || zoneKey;
       const group = document.createElement("div");
@@ -280,6 +294,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (seen.has(di.ch)) return;
         seen.add(di.ch);
 
+        // Textes adaptés selon le type
+        let stateText, stateIcon;
+        if (di.type === "porte") {
+          stateText = di.value ? "OUVERT" : "FERMÉ";
+          stateIcon = di.value ? "🔓" : "🔒";
+        } else {
+          stateText = di.value ? "DÉTECTÉ" : "OK";
+          stateIcon = di.value ? "🔴" : "🟢";
+        }
+
         const card = document.createElement("div");
         card.className = `di-card ${di.value ? "di-triggered" : "di-ok"}`;
         card.innerHTML = `
@@ -290,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
           <div class="di-card-state">
             <span class="di-indicator ${di.value ? "active" : "inactive"}"></span>
-            ${di.value ? "DÉCLENCHÉ" : "OK"}
+            ${stateText}
           </div>
         `;
         group.appendChild(card);
