@@ -76,6 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let diEvents = [];
   let alarmTriggered = false;
   let alarmInfo = null;
+  let armedBySchedule = false;
   let diPollingInterval = null;
 
   // Mapping relais DO (existant)
@@ -415,7 +416,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // ── UI State global ──
   function updateUiState() {
     alarmToggle.checked = !!isArmed;
-    alarmModeText.textContent = isArmed ? "Armée" : "Désarmée";
+
+    if (isArmed && armedBySchedule) {
+      alarmModeText.textContent = "Armée (auto)";
+    } else {
+      alarmModeText.textContent = isArmed ? "Armée" : "Désarmée";
+    }
+
     chipState.textContent = isArmed
       ? (alarmTriggered ? "🚨 ALARME EN COURS" : "SURVEILLANCE ACTIVE")
       : "SURVEILLANCE OFF";
@@ -452,6 +459,7 @@ document.addEventListener("DOMContentLoaded", () => {
         alarmConfig.siren_duration = status.siren_duration || 180;
         alarmTriggered = !!status.alarm_triggered;
         alarmInfo = status.alarm_info || null;
+        armedBySchedule = !!status.armed_by_schedule;
       }
     } catch (e) {
       // Fallback ancienne route
