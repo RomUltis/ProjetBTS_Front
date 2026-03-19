@@ -736,7 +736,7 @@ document.addEventListener("DOMContentLoaded", () => {
             armed: isArmed,
             zones,
             excluded_do: excludedDO,
-            siren_duration: Math.min(600, Math.max(10, duration)),
+            siren_duration: Math.min(600, Math.max(1, duration)),
           })
         });
 
