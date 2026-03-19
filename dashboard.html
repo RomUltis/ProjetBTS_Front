@@ -28,6 +28,15 @@
   </div>
 
   <div class="container">
+
+    <!-- BANNIÈRE ALARME DÉCLENCHÉE -->
+    <div id="alarmBanner" class="alarm-banner hidden">
+      <div class="alarm-banner-content">
+        <span id="alarmBannerText">🚨 ALARME DÉCLENCHÉE</span>
+        <button id="btnDisarm" class="btn btn-danger">⚠ DÉSARMER MAINTENANT</button>
+      </div>
+    </div>
+
     <div class="grid">
 
       <!-- ÉTAT / ARMEMENT -->
@@ -159,6 +168,61 @@
         <p class="hint muted">
           Astuce : pour un dashboard fluide, garde le sous-flux caméra et limite la résolution si besoin.
         </p>
+      </div>
+
+      <!-- CAPTEURS DI (PET-7050) -->
+      <div class="card wide">
+        <div class="card-header">
+          <h2>📡 Capteurs (Entrées DI)</h2>
+          <button id="btnRefreshDI" class="btn btn-ghost small-btn">Actualiser DI</button>
+        </div>
+        <p class="muted">
+          État en temps réel des détecteurs et contacts de porte — PET-7050
+        </p>
+        <div id="diStatusContainer"></div>
+      </div>
+
+      <!-- CONFIG ARMEMENT PAR ZONE -->
+      <div class="card wide">
+        <div class="card-header">
+          <h2>🛡 Configuration d'armement</h2>
+          <button id="btnSaveArmConfig" class="btn small-btn">Sauvegarder</button>
+        </div>
+
+        <div class="arm-config-grid">
+          <div class="arm-config-block">
+            <h3>Zones armées</h3>
+            <p class="muted">Sélectionne les zones à surveiller. Les zones non cochées seront ignorées.</p>
+            <div id="zoneCheckboxes" class="arm-checkboxes"></div>
+          </div>
+
+          <div class="arm-config-block">
+            <h3>Sorties exclues</h3>
+            <p class="muted">Coche les sorties DO à exclure du déclenchement (ex : tester seulement les flashs).</p>
+            <div id="doExclusionList" class="arm-checkboxes"></div>
+          </div>
+
+          <div class="arm-config-block">
+            <h3>Durée sirène</h3>
+            <p class="muted">Les sirènes s'arrêtent après cette durée. Les flashs restent actifs jusqu'au désarmement.</p>
+            <div class="input-group" style="max-width:200px;">
+              <label for="sirenDurationInput">Secondes</label>
+              <input type="number" id="sirenDurationInput" min="10" max="600" value="180" step="10">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORIQUE ÉVÉNEMENTS DI -->
+      <div class="card wide">
+        <div class="card-header">
+          <h2>📋 Historique des événements</h2>
+          <button id="btnLoadEvents" class="btn btn-ghost small-btn">Charger</button>
+        </div>
+        <p class="muted">
+          Derniers changements d'état des capteurs DI (max 50).
+        </p>
+        <div id="diEventList" class="di-event-list"></div>
       </div>
 
     </div>

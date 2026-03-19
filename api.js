@@ -54,6 +54,18 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// Proxy générique /api/* → backend
+// Couvre toutes les nouvelles routes DI :
+//   GET  /api/di/status
+//   GET  /api/di/read
+//   GET  /api/di/events
+//   GET  /api/di/mapping
+//   GET  /api/alarm/status
+//   POST /api/alarm/arm
+//   POST /api/alarm/disarm
+//   POST /api/pet/do/pulse
+//   POST /api/pet/do/test-all
+//   POST /api/pet/do/test-selected
 app.use("/api", async (req, res) => {
   try {
     const url = `${BACKEND_URL}${req.originalUrl}`;
@@ -76,6 +88,49 @@ app.use("/api", async (req, res) => {
       ok: false,
       error: "Erreur API Proxy (/api)",
     });
+  }
+});
+
+// Proxy routes legacy (alarm, schedule, rfid) — sans préfixe /api
+app.use("/alarm", async (req, res) => {
+  try {
+    const url = `${BACKEND_URL}${req.originalUrl}`;
+    const response = await axios({
+      method: req.method, url, data: req.body,
+      headers: { "Content-Type": "application/json", Authorization: req.headers.authorization || "" },
+      validateStatus: () => true,
+    });
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({ ok: false, error: "Erreur Proxy (/alarm)" });
+  }
+});
+
+app.use("/schedule", async (req, res) => {
+  try {
+    const url = `${BACKEND_URL}${req.originalUrl}`;
+    const response = await axios({
+      method: req.method, url, data: req.body,
+      headers: { "Content-Type": "application/json", Authorization: req.headers.authorization || "" },
+      validateStatus: () => true,
+    });
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({ ok: false, error: "Erreur Proxy (/schedule)" });
+  }
+});
+
+app.use("/rfid", async (req, res) => {
+  try {
+    const url = `${BACKEND_URL}${req.originalUrl}`;
+    const response = await axios({
+      method: req.method, url, data: req.body,
+      headers: { "Content-Type": "application/json", Authorization: req.headers.authorization || "" },
+      validateStatus: () => true,
+    });
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    res.status(error.response?.status || 500).json({ ok: false, error: "Erreur Proxy (/rfid)" });
   }
 });
 
