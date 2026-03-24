@@ -26,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const rfidUid = document.getElementById("rfidUid");
   const rfidOwner = document.getElementById("rfidOwner");
   const btnAddBadge = document.getElementById("btnAddBadge");
+  const btnEnrollRfid = document.getElementById("btnEnrollRfid");
+  const enrollCountdown = document.getElementById("enrollCountdown");
   const badgeList = document.getElementById("badgeList");
 
   const toast = document.getElementById("toast");
@@ -78,6 +80,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let alarmInfo = null;
   let armedBySchedule = false;
   let diPollingInterval = null;
+  let enrollInterval = null;
+  let enrolling = false;
 
   // Mapping relais DO (existant)
   const RELAYS = [
@@ -510,13 +514,26 @@ document.addEventListener("DOMContentLoaded", () => {
             const wasTriggered = alarmTriggered;
             alarmTriggered = di.alarm_triggered;
             alarmInfo = di.alarm_info || null;
-            // Si changement d'état alarme → refresh complet
             if (wasTriggered !== alarmTriggered) {
               renderAlarmBanner();
               updateUiState();
             }
           }
           renderDIStatus();
+        }
+      } catch {}
+
+      // Vérifier aussi l'état armé/désarmé (changé par badge RFID)
+      try {
+        const status = await api("/api/alarm/status", { method: "GET" });
+        if (status) {
+          const wasArmed = isArmed;
+          isArmed = !!status.armed;
+          armedBySchedule = !!status.armed_by_schedule;
+          if (wasArmed !== isArmed) {
+            alarmToggle.checked = isArmed;
+            updateUiState();
+          }
         }
       } catch {}
     }, 2000);
@@ -687,6 +704,77 @@ document.addEventListener("DOMContentLoaded", () => {
       await loadAll();
     } catch (e) { setHint(e.message, true); }
   });
+
+  // ── Détection automatique RFID (enrollment) ──
+
+  function stopEnrollment() {
+    enrolling = false;
+    if (enrollInterval) { clearInterval(enrollInterval); enrollInterval = null; }
+    if (btnEnrollRfid) {
+      btnEnrollRfid.textContent = "📡 Détection auto";
+      btnEnrollRfid.classList.remove("btn-enrolling");
+    }
+    if (enrollCountdown) enrollCountdown.classList.add("hidden");
+  }
+
+  if (btnEnrollRfid) {
+    btnEnrollRfid.addEventListener("click", async () => {
+      // Si déjà en cours → annuler
+      if (enrolling) {
+        try { await api("/rfid/enroll/stop", { method: "POST", json: true, body: "{}" }); } catch {}
+        stopEnrollment();
+        showToast("Détection annulée");
+        return;
+      }
+
+      // Lancer l'enrollment
+      try {
+        const r = await api("/rfid/enroll/start", { method: "POST", json: true, body: "{}" });
+        if (!r || !r.ok) throw new Error(r?.error || "Erreur enrollment");
+
+        enrolling = true;
+        btnEnrollRfid.textContent = "⏹ Annuler détection";
+        btnEnrollRfid.classList.add("btn-enrolling");
+        enrollCountdown.classList.remove("hidden");
+        showToast("Badgez maintenant…");
+
+        // Polling toutes les secondes
+        enrollInterval = setInterval(async () => {
+          try {
+            const s = await api("/rfid/enroll/status", { method: "GET" });
+            if (!s || !s.ok) return;
+
+            // Badge détecté
+            if (s.detected_uid) {
+              rfidUid.value = s.detected_uid;
+              stopEnrollment();
+              showToast("Badge détecté : " + s.detected_uid);
+              // Focus sur le champ propriétaire
+              rfidOwner.focus();
+              return;
+            }
+
+            // Mettre à jour le décompte
+            if (s.remaining_seconds > 0) {
+              enrollCountdown.textContent = `⏳ ${s.remaining_seconds}s restantes — Présentez un badge`;
+            }
+
+            // Expiré
+            if (!s.active && !s.detected_uid) {
+              stopEnrollment();
+              showToast("Aucun badge détecté (timeout)");
+            }
+          } catch {
+            stopEnrollment();
+          }
+        }, 1000);
+
+      } catch (e) {
+        setHint("Erreur détection auto : " + (e.message || e), true);
+        stopEnrollment();
+      }
+    });
+  }
 
   // ── NOUVEAU : Boutons DI ──
 
