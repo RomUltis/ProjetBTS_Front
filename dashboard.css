@@ -790,3 +790,57 @@ h2{
 .btn.btn-enrolling:hover{
   background:rgba(231,76,60,0.25);
 }
+
+/* ── Enregistrement caméra ── */
+
+.btn-rec{
+  background:rgba(231,76,60,0.9);
+  color:#fff;
+}
+.btn-rec:hover{
+  background:#c0392b;
+}
+
+.btn-rec-stop{
+  background:rgba(0,0,0,0.7);
+  color:#fff;
+}
+.btn-rec-stop:hover{
+  background:rgba(0,0,0,0.85);
+}
+.btn-rec-stop.hidden, .hidden{ display:none; }
+
+.rec-status{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 14px;
+  margin-top:10px;
+  border-radius:10px;
+  background:rgba(231,76,60,0.08);
+  border:1px solid rgba(231,76,60,0.25);
+  font-size:13px;
+  font-weight:600;
+  color:#c0392b;
+}
+.rec-status.hidden{ display:none; }
+
+.rec-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#e74c3c;
+  animation: rec-blink 1s ease-in-out infinite;
+  flex-shrink:0;
+}
+
+@keyframes rec-blink{
+  0%,100%{ opacity:1; }
+  50%{ opacity:.3; }
+}
+
+#recTimer{
+  margin-left:auto;
+  font-family:monospace;
+  font-size:14px;
+}

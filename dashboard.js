@@ -42,6 +42,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCamSub = document.getElementById("btnCamSub");
   const btnCamMain = document.getElementById("btnCamMain");
 
+  // Enregistrement
+  const btnRecStart = document.getElementById("btnRecStart");
+  const btnRecStop = document.getElementById("btnRecStop");
+  const recStatus = document.getElementById("recStatus");
+  const recStatusText = document.getElementById("recStatusText");
+  const recTimer = document.getElementById("recTimer");
+  let recTimerInterval = null;
+
   // Modal test relais
   const relayModal = document.getElementById("relayModal");
   const relayModalClose = document.getElementById("relayModalClose");
@@ -945,6 +953,83 @@ document.addEventListener("DOMContentLoaded", () => {
     camSetStatus("Flux principal sélectionné");
     if (camIsPlaying) { stopCam(); startCam(); }
   });
+
+  // ── Enregistrement caméra ──
+
+  function formatRecTime(seconds) {
+    const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const s = String(seconds % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function startRecUI() {
+    if (btnRecStart) btnRecStart.classList.add("hidden");
+    if (btnRecStop) btnRecStop.classList.remove("hidden");
+    if (recStatus) recStatus.classList.remove("hidden");
+    let elapsed = 0;
+    if (recTimer) recTimer.textContent = "00:00";
+    recTimerInterval = setInterval(() => {
+      elapsed++;
+      if (recTimer) recTimer.textContent = formatRecTime(elapsed);
+    }, 1000);
+  }
+
+  function stopRecUI() {
+    if (btnRecStart) btnRecStart.classList.remove("hidden");
+    if (btnRecStop) btnRecStop.classList.add("hidden");
+    if (recStatus) recStatus.classList.add("hidden");
+    if (recTimerInterval) { clearInterval(recTimerInterval); recTimerInterval = null; }
+  }
+
+  if (btnRecStart) {
+    btnRecStart.addEventListener("click", async () => {
+      try {
+        btnRecStart.disabled = true;
+        const r = await api("/api/cam/record/start", { method: "POST", json: true, body: "{}" });
+        if (!r || !r.ok) throw new Error(r?.error || "Erreur enregistrement");
+        startRecUI();
+        showToast("Enregistrement démarré");
+      } catch (e) {
+        setHint("Erreur enregistrement : " + (e.message || e), true);
+      } finally {
+        btnRecStart.disabled = false;
+      }
+    });
+  }
+
+  if (btnRecStop) {
+    btnRecStop.addEventListener("click", async () => {
+      try {
+        btnRecStop.disabled = true;
+        const r = await api("/api/cam/record/stop", { method: "POST", json: true, body: "{}" });
+        if (!r || !r.ok) throw new Error(r?.error || "Erreur arrêt");
+        stopRecUI();
+        showToast(`Enregistrement sauvegardé (${r.duration_seconds}s)`);
+      } catch (e) {
+        setHint("Erreur arrêt : " + (e.message || e), true);
+      } finally {
+        btnRecStop.disabled = false;
+      }
+    });
+  }
+
+  // Vérifier si un enregistrement est déjà en cours au chargement
+  (async () => {
+    try {
+      const r = await api("/api/cam/record/status", { method: "GET" });
+      if (r && r.recording) {
+        startRecUI();
+        // Synchroniser le timer avec le temps réel
+        if (recTimerInterval) clearInterval(recTimerInterval);
+        let elapsed = r.elapsed_seconds || 0;
+        if (recTimer) recTimer.textContent = formatRecTime(elapsed);
+        recTimerInterval = setInterval(() => {
+          elapsed++;
+          if (recTimer) recTimer.textContent = formatRecTime(elapsed);
+        }, 1000);
+      }
+    } catch {}
+  })();
 
   // ── Init ──
   loadAll().catch(e => setHint(e.message, true));

@@ -135,8 +135,16 @@
               <button class="btn btn-ghost" id="btnCamStop">Couper</button>
               <button class="btn btn-ghost" id="btnCamSub">Sous-flux</button>
               <button class="btn btn-ghost" id="btnCamMain">Flux principal</button>
+              <button class="btn btn-rec" id="btnRecStart">⏺ Enregistrer</button>
+              <button class="btn btn-rec-stop hidden" id="btnRecStop">⏹ Arrêter</button>
             </div>
           </div>
+        </div>
+
+        <div id="recStatus" class="rec-status hidden">
+          <span class="rec-dot"></span>
+          <span id="recStatusText">Enregistrement en cours…</span>
+          <span id="recTimer">00:00</span>
         </div>
 
         <p class="hint muted">
