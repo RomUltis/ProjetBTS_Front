@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const chipState = document.getElementById("chipState");
   const alarmToggle = document.getElementById("alarmToggle");
   const alarmModeText = document.getElementById("alarmModeText");
+  const beepToggle = document.getElementById("beepToggle");
+  const beepModeText = document.getElementById("beepModeText");
   const kpiSchedule = document.getElementById("kpiSchedule");
   const kpiBadges = document.getElementById("kpiBadges");
   const hintBox = document.getElementById("hintBox");
@@ -464,6 +466,10 @@ document.addEventListener("DOMContentLoaded", () => {
         alarmTriggered = !!status.alarm_triggered;
         alarmInfo = status.alarm_info || null;
         armedBySchedule = !!status.armed_by_schedule;
+        if (status.beep_enabled !== undefined && beepToggle) {
+          beepToggle.checked = status.beep_enabled;
+          beepModeText.textContent = status.beep_enabled ? "Activés" : "Désactivés";
+        }
       }
     } catch (e) {
       // Fallback ancienne route
@@ -647,6 +653,7 @@ document.addEventListener("DOMContentLoaded", () => {
           zones: alarmConfig.armed_zones,
           excluded_do: alarmConfig.excluded_do,
           siren_duration: alarmConfig.siren_duration,
+          beep: beepToggle.checked,
         })
       });
       isArmed = desired;
@@ -657,6 +664,17 @@ document.addEventListener("DOMContentLoaded", () => {
       alarmToggle.checked = !alarmToggle.checked;
       setHint(e.message, true);
     }
+  });
+
+  beepToggle.addEventListener("change", async () => {
+    beepModeText.textContent = beepToggle.checked ? "Activés" : "Désactivés";
+    try {
+      await api("/api/alarm/arm", {
+        method: "POST", json: true,
+        body: JSON.stringify({ beep: beepToggle.checked })
+      });
+      showToast(beepToggle.checked ? "Bips activés" : "Bips désactivés");
+    } catch {}
   });
 
   btnTestSiren.addEventListener("click", async () => {
