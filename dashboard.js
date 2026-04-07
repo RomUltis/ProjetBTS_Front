@@ -7,6 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  const userRole = localStorage.getItem("role") || "user";
+  const isAdmin = userRole === "admin";
+
   const systemSubtitle = document.getElementById("systemSubtitle");
   const chipState = document.getElementById("chipState");
   const alarmToggle = document.getElementById("alarmToggle");
@@ -64,6 +67,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnRefreshDI = document.getElementById("btnRefreshDI");
   const btnLoadEvents = document.getElementById("btnLoadEvents");
 
+  // ── Gestion utilisateurs ──
+  const cardUsers = document.getElementById("cardUsers");
+  const userList = document.getElementById("userList");
+  const btnRefreshUsers = document.getElementById("btnRefreshUsers");
+
   // ── Armement avancé (NOUVEAU) ──
   const zoneCheckboxes = document.getElementById("zoneCheckboxes");
   const doExclusionList = document.getElementById("doExclusionList");
@@ -92,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let diPollingInterval = null;
   let enrollInterval = null;
   let enrolling = false;
+  let users = [];
 
   // Mapping relais DO (existant)
   const RELAYS = [
@@ -408,6 +417,92 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ══════════════════════════════════════════════════════════
+  //  Gestion des utilisateurs (admin only)
+  // ══════════════════════════════════════════════════════════
+
+  function renderUsers() {
+    if (!userList) return;
+    userList.innerHTML = "";
+
+    if (!users.length) {
+      userList.innerHTML = `<div class="t-row"><div class="muted" style="grid-column:1/-1">Aucun utilisateur</div></div>`;
+      return;
+    }
+
+    const currentUserId = Number(localStorage.getItem("userId"));
+
+    users.forEach(u => {
+      const row = document.createElement("div");
+      row.className = "t-row";
+      const isSelf = u.id === currentUserId;
+      const isAdminUser = u.role === "admin";
+
+      row.innerHTML = `
+        <div>${u.id}</div>
+        <div>${escapeHtml(u.username)}${isSelf ? ' <span class="badge on">Vous</span>' : ""}</div>
+        <div><span class="badge ${isAdminUser ? "on" : "off"}">${isAdminUser ? "Admin" : "Utilisateur"}</span></div>
+        <div class="t-right">
+          <div class="row-actions">
+            ${isSelf ? '<span class="muted" style="font-size:12px">—</span>' : `
+              <button class="btn btn-ghost small-btn" data-role-toggle="${u.id}" data-current="${u.role}">
+                ${isAdminUser ? "Rétrograder" : "Promouvoir admin"}
+              </button>
+              <button class="btn btn-danger small-btn" data-del-user="${u.id}" data-name="${escapeHtml(u.username)}">Supprimer</button>
+            `}
+          </div>
+        </div>
+      `;
+      userList.appendChild(row);
+    });
+
+    // Event : promouvoir / rétrograder
+    userList.querySelectorAll("button[data-role-toggle]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const uid = Number(btn.getAttribute("data-role-toggle"));
+        const current = btn.getAttribute("data-current");
+        const newRole = current === "admin" ? "user" : "admin";
+        const userName = users.find(u => u.id === uid)?.username || "";
+
+        if (!confirm(`${newRole === "admin" ? "Promouvoir" : "Rétrograder"} ${userName} en ${newRole} ?`)) return;
+
+        try {
+          await api(`/api/users/${uid}/role`, {
+            method: "PATCH", json: true,
+            body: JSON.stringify({ role: newRole })
+          });
+          showToast(`${userName} → ${newRole}`);
+          await loadUsers();
+        } catch (e) { setHint(e.message, true); }
+      });
+    });
+
+    // Event : supprimer
+    userList.querySelectorAll("button[data-del-user]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const uid = Number(btn.getAttribute("data-del-user"));
+        const name = btn.getAttribute("data-name");
+        if (!confirm(`Supprimer le compte de ${name} ? Cette action est irréversible.`)) return;
+
+        try {
+          await api(`/api/users/${uid}`, { method: "DELETE" });
+          showToast(`${name} supprimé`);
+          await loadUsers();
+        } catch (e) { setHint(e.message, true); }
+      });
+    });
+  }
+
+  async function loadUsers() {
+    try {
+      const r = await api("/api/users", { method: "GET" });
+      if (r && r.users) {
+        users = r.users;
+        renderUsers();
+      }
+    } catch {} // 403 pour les non-admins, on ignore
+  }
+
+  // ══════════════════════════════════════════════════════════
   //  NOUVEAU : Bannière alarme déclenchée
   // ══════════════════════════════════════════════════════════
 
@@ -513,6 +608,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderBadges();
     renderDIStatus();
     renderArmConfig();
+    if (isAdmin) await loadUsers();
     updateUiState();
   }
 
@@ -840,6 +936,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // ── Bouton refresh utilisateurs ──
+  if (btnRefreshUsers) {
+    btnRefreshUsers.addEventListener("click", async () => {
+      try {
+        btnRefreshUsers.disabled = true;
+        await loadUsers();
+        showToast("Utilisateurs actualisés");
+      } catch (e) {
+        setHint("Erreur chargement utilisateurs : " + (e.message || e), true);
+      } finally {
+        btnRefreshUsers.disabled = false;
+      }
+    });
+  }
+
   // ── NOUVEAU : Sauvegarde config armement ──
 
   if (btnSaveArmConfig) {
@@ -1031,7 +1142,36 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch {}
   })();
 
+  // ── Gestion des rôles (admin/user) ──
+  if (!isAdmin) {
+    // Masquer tout sauf la caméra pour les utilisateurs normaux
+    document.querySelectorAll(".grid > .card").forEach(card => {
+      const h2 = card.querySelector("h2");
+      if (!h2) return;
+      const title = h2.textContent.toLowerCase();
+      // Garder uniquement la carte caméra
+      if (!title.includes("caméra") && !title.includes("camera")) {
+        card.style.display = "none";
+      }
+    });
+
+    // Masquer la bannière alarme et les éléments admin dans la topbar
+    if (alarmBanner) alarmBanner.style.display = "none";
+
+    // Masquer les boutons d'enregistrement sur la caméra
+    if (btnRecStart) btnRecStart.style.display = "none";
+    if (btnRecStop) btnRecStop.style.display = "none";
+
+    // Changer le sous-titre
+    if (systemSubtitle) systemSubtitle.textContent = "Mode visualisation";
+  }
+
   // ── Init ──
-  loadAll().catch(e => setHint(e.message, true));
-  startDIPolling();
+  if (isAdmin) {
+    loadAll().catch(e => setHint(e.message, true));
+    startDIPolling();
+  } else {
+    // User normal : charger juste le minimum (pas de polling DI, pas de loadAll)
+    if (systemSubtitle) systemSubtitle.textContent = `Connecté — Mode visualisation`;
+  }
 });

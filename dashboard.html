@@ -121,6 +121,9 @@
       <!-- CAMÉRA (DANS LA GRID, PAS EN DEHORS) -->
       <div class="card wide">
         <h2>Caméra (Dahua)</h2>
+        <p class="muted">
+          Flux live via le serveur (identifiants caméra jamais exposés au navigateur).
+        </p>
 
         <div class="cam-wrap">
           <video id="camVideo" autoplay playsinline muted controls></video>
@@ -242,6 +245,27 @@
           Derniers changements d'état des capteurs DI (max 50).
         </p>
         <div id="diEventList" class="di-event-list"></div>
+      </div>
+
+      <!-- GESTION DES UTILISATEURS (admin only) -->
+      <div class="card wide" id="cardUsers">
+        <div class="card-header">
+          <h2>👥 Gestion des utilisateurs</h2>
+          <button id="btnRefreshUsers" class="btn btn-ghost small-btn">Actualiser</button>
+        </div>
+        <p class="muted">
+          Promeus un utilisateur en administrateur ou rétrograde-le. Seuls les admins voient cette section.
+        </p>
+
+        <div class="table">
+          <div class="t-head">
+            <div>ID</div>
+            <div>Nom d'utilisateur</div>
+            <div>Rôle</div>
+            <div class="t-right">Actions</div>
+          </div>
+          <div id="userList" class="t-body"></div>
+        </div>
       </div>
 
     </div>
