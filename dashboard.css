@@ -844,3 +844,158 @@ h2{
   font-family:monospace;
   font-size:14px;
 }
+
+/* ═══════════════════════════════════════════════════
+   GRILLE CAMÉRAS MULTI-CAM
+   ═══════════════════════════════════════════════════ */
+
+.cams-toolbar{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* Grille par défaut : 2x2 égales.
+   Aspect-ratio adapté pour des caméras de surveillance (souvent 4:3 ou 16:9).
+   On choisit 4:3 globalement → ça donne 4 tuiles à peu près 2:1 chacune,
+   ce qui matche bien des flux 4:3 et 16:9. */
+.cams-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap:10px;
+  margin-top:10px;
+  aspect-ratio: 16 / 10;
+  background:#000;
+  border-radius:10px;
+  padding:6px;
+}
+
+/* Tuile caméra */
+.cam-tile{
+  position:relative;
+  background:#000;
+  border-radius:8px;
+  overflow:hidden;
+  cursor:pointer;
+  border:2px solid transparent;
+  transition: border-color .2s, transform .2s;
+  min-height:0; /* important pour les grilles css avec aspect-ratio */
+  min-width:0;
+}
+.cam-tile:hover{
+  border-color: rgba(102,126,234,0.6);
+}
+.cam-tile.active{
+  border-color: var(--primary);
+  cursor: default;
+}
+
+.cam-tile video{
+  width:100%;
+  height:100%;
+  /* contain = on voit TOUTE l'image (bandes noires si besoin) au lieu de cropper.
+     Pour de la surveillance c'est ce qu'on veut : pas de zone aveugle. */
+  object-fit: contain;
+  background:#000;
+  display:block;
+}
+
+.cam-tile-label{
+  position:absolute;
+  left:8px;
+  top:8px;
+  padding:4px 10px;
+  background:rgba(0,0,0,0.65);
+  color:#fff;
+  border-radius:6px;
+  font-size:12px;
+  font-weight:600;
+  pointer-events:none;
+  text-shadow:0 1px 2px rgba(0,0,0,0.5);
+}
+
+.cam-tile-status{
+  position:absolute;
+  right:8px;
+  top:8px;
+  padding:3px 8px;
+  background:rgba(0,0,0,0.55);
+  color:#fff;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:600;
+  pointer-events:none;
+}
+.cam-tile-status.ok{
+  background: rgba(46,204,113,0.85);
+}
+.cam-tile-status.error{
+  background: rgba(231,76,60,0.85);
+}
+
+/* Actions affichées seulement sur la tuile active */
+.cam-tile-actions{
+  position:absolute;
+  left:0; right:0; bottom:0;
+  padding:8px;
+  display:none;
+  gap:6px;
+  flex-wrap:wrap;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0));
+}
+.cam-tile.active .cam-tile-actions{
+  display:flex;
+}
+.cam-tile-actions .btn{
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+/* Mode focus : 1 grosse cam à gauche (4:3) + 3 mini sur le côté droit.
+   Ratio adapté pour que la grosse cam reste lisible sans avoir trop de
+   bandes noires verticales. */
+.cams-grid.focus-mode{
+  grid-template-columns: 4fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  aspect-ratio: 16 / 9;
+}
+.cams-grid.focus-mode .cam-tile.active{
+  grid-column: 1;
+  grid-row: 1 / 4; /* prend les 3 rangées */
+}
+.cams-grid.focus-mode .cam-tile:not(.active){
+  grid-column: 2;
+}
+
+/* Mode plein écran (toute la fenêtre) */
+.cams-grid:fullscreen,
+.cams-grid.fake-fullscreen{
+  aspect-ratio: auto;
+  width:100vw;
+  height:100vh;
+  border-radius:0;
+  padding:8px;
+  background:#000;
+}
+.cams-grid:fullscreen.focus-mode .cam-tile.active,
+.cams-grid.fake-fullscreen.focus-mode .cam-tile.active{
+  grid-row: 1 / 4;
+}
+
+/* Responsive : sur mobile, on empile */
+@media (max-width: 768px){
+  .cams-grid{
+    aspect-ratio: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(4, 200px);
+  }
+  .cams-grid.focus-mode{
+    grid-template-columns: 1fr;
+    grid-template-rows: 300px repeat(3, 120px);
+  }
+  .cams-grid.focus-mode .cam-tile.active{
+    grid-column: 1;
+    grid-row: 1;
+  }
+}

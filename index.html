@@ -27,6 +27,7 @@
             </form>
             <p id="error-message" class="error"></p>
             <p>Pas encore de compte ? <a href="#" id="showRegister">Créer un compte</a></p>
+            <p id="register-disabled-message" class="error" style="display: none;">Inscription désactivé</p>
         </div>
         
         <div class="register-card" style="display: none;">
@@ -48,5 +49,32 @@
     </div>
     
     <script src="script.js"></script>
+    <script>
+        // Désactivation temporaire des inscriptions
+        const showRegisterLink = document.getElementById('showRegister');
+        const registerCard = document.querySelector('.register-card');
+        const loginCard = document.querySelector('.login-card');
+        const registerDisabledMessage = document.getElementById('register-disabled-message');
+
+        if (showRegisterLink) {
+            showRegisterLink.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+
+                if (registerCard) {
+                    registerCard.style.display = 'none';
+                }
+
+                if (loginCard) {
+                    loginCard.style.display = 'block';
+                }
+
+                if (registerDisabledMessage) {
+                    registerDisabledMessage.style.display = 'block';
+                    registerDisabledMessage.textContent = 'Inscription désactivé';
+                }
+            }, true);
+        }
+    </script>
 </body>
 </html>

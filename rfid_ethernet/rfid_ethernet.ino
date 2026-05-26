@@ -13,7 +13,7 @@ IPAddress ip(172, 29, 19, 200);
 // IP de ta VM — on tape directement sur le backend (port 3001)
 // pour éviter de passer par le proxy qui demande CORS/auth
 IPAddress server(172, 29, 19, 193);
-const int serverPort = 3001;
+const int serverPort = 80;
 
 // ──────────────── FONCTIONS ────────────────
 

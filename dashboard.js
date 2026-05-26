@@ -1,5 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const API_URL = "http://172.29.19.193:3002";
+  // API sur le même serveur (adjudicator.js sert le front + l'API)
+  const API_URL = "";
 
   const token = localStorage.getItem("token");
   if (!token) {
@@ -37,17 +38,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const toast = document.getElementById("toast");
 
-  // Caméra
-  const camVideo = document.getElementById("camVideo");
-  const camStatus = document.getElementById("camStatus");
-  const btnCamStart = document.getElementById("btnCamStart");
-  const btnCamStop = document.getElementById("btnCamStop");
-  const btnCamSub = document.getElementById("btnCamSub");
-  const btnCamMain = document.getElementById("btnCamMain");
+  // Caméras (multi-cam)
+  const camsGrid = document.getElementById("camsGrid");
+  const btnCamsQuality = document.getElementById("btnCamsQuality");
+  const btnCamsFullscreen = document.getElementById("btnCamsFullscreen");
 
-  // Enregistrement
-  const btnRecStart = document.getElementById("btnRecStart");
-  const btnRecStop = document.getElementById("btnRecStop");
+  // Enregistrement (bandeau global de statut, partagé entre toutes les cams)
   const recStatus = document.getElementById("recStatus");
   const recStatusText = document.getElementById("recStatusText");
   const recTimer = document.getElementById("recTimer");
@@ -1006,66 +1002,254 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ── Caméra (inchangé) ──
-  let hls = null;
-  let camIsPlaying = false;
-  let currentCamUrl = "/cam/sub/live.m3u8";
+  // ── Caméras (multi-cam) ──
+  //
+  // - Récupère la liste des caméras depuis /api/cam/list
+  // - Crée 1 tuile + 1 lecteur HLS par caméra (4 flux en parallèle)
+  // - Clic sur tuile = focus mode (la tuile cliquée devient grande, les 3 autres en mini)
+  // - Bouton plein écran = grille entière prend toute la fenêtre
 
-  function camSetStatus(msg) { camStatus.textContent = msg; }
+  const camPlayers = {}; // { camId: { hls, video, name, qualityUrl } }
+  let camsList = [];
+  let currentQuality = "sub"; // "sub" (par défaut) ou "main"
+  let activeCamId = null;
 
-  function startCam() {
-    camSetStatus("Connexion caméra…");
+  function buildHlsPlayer(video, url) {
     if (window.Hls && Hls.isSupported()) {
-      if (hls) { hls.destroy(); hls = null; }
-      hls = new Hls({
-        lowLatencyMode: true, liveSyncDuration: 1, liveMaxLatencyDuration: 2,
-        maxBufferLength: 1, maxMaxBufferLength: 2, backBufferLength: 0, enableWorker: true
+      const hls = new Hls({
+        lowLatencyMode: true,
+        liveSyncDuration: 1,
+        liveMaxLatencyDuration: 2,
+        maxBufferLength: 1,
+        maxMaxBufferLength: 2,
+        backBufferLength: 0,
+        enableWorker: true,
       });
-      hls.loadSource(currentCamUrl);
-      hls.attachMedia(camVideo);
+      hls.loadSource(url);
+      hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        camVideo.play().catch(() => {});
-        camSetStatus("Caméra en live");
-        camIsPlaying = true;
-        camVideo.addEventListener("timeupdate", () => {
-          if (hls && hls.liveSyncPosition) {
-            const delta = camVideo.currentTime - hls.liveSyncPosition;
-            if (delta > 2) camVideo.currentTime = hls.liveSyncPosition;
-          }
-        });
+        video.play().catch(() => {});
       });
-      hls.on(Hls.Events.ERROR, () => { camSetStatus("Erreur flux caméra"); });
-    } else {
-      camVideo.src = currentCamUrl;
-      camVideo.play().catch(() => {});
-      camIsPlaying = true;
-      camSetStatus("Caméra en live");
+      hls.on(Hls.Events.ERROR, (_evt, data) => {
+        if (data.fatal) {
+          // Retry après 3s
+          setTimeout(() => {
+            try { hls.loadSource(url); } catch {}
+          }, 3000);
+        }
+      });
+      return hls;
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari natif
+      video.src = url;
+      video.play().catch(() => {});
+      return null;
+    }
+    return null;
+  }
+
+  function destroyHlsPlayer(camId) {
+    const p = camPlayers[camId];
+    if (!p) return;
+    if (p.hls) { try { p.hls.destroy(); } catch {} p.hls = null; }
+    if (p.video) {
+      p.video.pause();
+      p.video.removeAttribute("src");
+      p.video.load();
     }
   }
 
-  function stopCam() {
-    if (hls) { hls.destroy(); hls = null; }
-    camVideo.pause();
-    camVideo.removeAttribute("src");
-    camVideo.load();
-    camIsPlaying = false;
-    camSetStatus("Caméra coupée");
+  function renderCamsGrid() {
+    if (!camsGrid) return;
+    camsGrid.innerHTML = "";
+
+    if (!camsList.length) {
+      camsGrid.innerHTML = `<div style="grid-column:1/-1;color:#fff;padding:20px;text-align:center;">
+        Aucune caméra configurée. Vérifie les variables CAMn_* du .env.
+      </div>`;
+      return;
+    }
+
+    camsList.forEach((cam) => {
+      const tile = document.createElement("div");
+      tile.className = "cam-tile";
+      tile.dataset.camId = cam.id;
+      tile.innerHTML = `
+        <video autoplay playsinline muted></video>
+        <div class="cam-tile-label">${cam.name}</div>
+        <div class="cam-tile-status" data-status>…</div>
+        <div class="cam-tile-actions">
+          <button class="btn btn-rec" data-action="rec-start">⏺ Enregistrer</button>
+          <button class="btn btn-rec-stop hidden" data-action="rec-stop">⏹ Arrêter</button>
+        </div>
+      `;
+      camsGrid.appendChild(tile);
+
+      const video = tile.querySelector("video");
+      const statusEl = tile.querySelector("[data-status]");
+      const url = currentQuality === "main" ? cam.hls_main : cam.hls_sub;
+
+      const hls = buildHlsPlayer(video, url);
+      camPlayers[cam.id] = { hls, video, name: cam.name, statusEl, tile };
+
+      // Statut basique : si le video joue, on passe en "ok"
+      video.addEventListener("playing", () => {
+        statusEl.textContent = "LIVE";
+        statusEl.className = "cam-tile-status ok";
+      });
+      video.addEventListener("error", () => {
+        statusEl.textContent = "ERR";
+        statusEl.className = "cam-tile-status error";
+      });
+      video.addEventListener("stalled", () => {
+        statusEl.textContent = "…";
+        statusEl.className = "cam-tile-status";
+      });
+
+      // Clic = focus
+      tile.addEventListener("click", (e) => {
+        // Ignore les clics sur les boutons d'action
+        if (e.target.closest("[data-action]")) return;
+        focusCam(cam.id);
+      });
+
+      // Boutons enregistrement par caméra (admin only)
+      const btnRecStart = tile.querySelector('[data-action="rec-start"]');
+      const btnRecStop = tile.querySelector('[data-action="rec-stop"]');
+
+      if (!isAdmin) {
+        btnRecStart.style.display = "none";
+        btnRecStop.style.display = "none";
+      } else {
+        btnRecStart.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            btnRecStart.disabled = true;
+            const r = await api("/api/cam/record/start", {
+              method: "POST", json: true, body: JSON.stringify({ cam_id: cam.id })
+            });
+            if (!r || !r.ok) throw new Error(r?.error || "Erreur enregistrement");
+            btnRecStart.classList.add("hidden");
+            btnRecStop.classList.remove("hidden");
+            showToast(`Enregistrement démarré sur ${cam.name}`);
+          } catch (e) {
+            showToast("Erreur : " + (e.message || e));
+          } finally {
+            btnRecStart.disabled = false;
+          }
+        });
+
+        btnRecStop.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            btnRecStop.disabled = true;
+            const r = await api("/api/cam/record/stop", {
+              method: "POST", json: true, body: JSON.stringify({ cam_id: cam.id })
+            });
+            if (!r || !r.ok) throw new Error(r?.error || "Erreur arrêt");
+            btnRecStop.classList.add("hidden");
+            btnRecStart.classList.remove("hidden");
+            showToast(`Enregistrement sauvegardé (${r.duration_seconds}s)`);
+          } catch (e) {
+            showToast("Erreur : " + (e.message || e));
+          } finally {
+            btnRecStop.disabled = false;
+          }
+        });
+      }
+    });
+
+    // Focus initial sur la première cam
+    if (camsList.length > 0) {
+      focusCam(camsList[0].id);
+    }
   }
 
-  btnCamStart.addEventListener("click", startCam);
-  btnCamStop.addEventListener("click", stopCam);
-  btnCamSub.addEventListener("click", () => {
-    currentCamUrl = "/cam/sub/live.m3u8";
-    camSetStatus("Sous-flux sélectionné");
-    if (camIsPlaying) { stopCam(); startCam(); }
-  });
-  btnCamMain.addEventListener("click", () => {
-    currentCamUrl = "/cam/main/live.m3u8";
-    camSetStatus("Flux principal sélectionné");
-    if (camIsPlaying) { stopCam(); startCam(); }
+  function focusCam(camId) {
+    activeCamId = camId;
+    if (!camsGrid) return;
+    camsGrid.classList.add("focus-mode");
+    camsGrid.querySelectorAll(".cam-tile").forEach(t => {
+      t.classList.toggle("active", t.dataset.camId === camId);
+    });
+  }
+
+  function switchQuality(quality) {
+    currentQuality = quality;
+    if (btnCamsQuality) {
+      btnCamsQuality.dataset.quality = quality;
+      btnCamsQuality.textContent = quality === "main"
+        ? "Qualité : Principal"
+        : "Qualité : Sous-flux";
+    }
+    // Recharge chaque lecteur avec la nouvelle URL
+    camsList.forEach((cam) => {
+      destroyHlsPlayer(cam.id);
+      const url = quality === "main" ? cam.hls_main : cam.hls_sub;
+      const p = camPlayers[cam.id];
+      if (p && p.video) {
+        p.hls = buildHlsPlayer(p.video, url);
+      }
+    });
+  }
+
+  if (btnCamsQuality) {
+    btnCamsQuality.addEventListener("click", () => {
+      switchQuality(currentQuality === "main" ? "sub" : "main");
+    });
+  }
+
+  // Plein écran (API native + fallback "fake-fullscreen" si refusé)
+  if (btnCamsFullscreen) {
+    btnCamsFullscreen.addEventListener("click", async () => {
+      if (!camsGrid) return;
+      const inFs = document.fullscreenElement === camsGrid || camsGrid.classList.contains("fake-fullscreen");
+      if (inFs) {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+        camsGrid.classList.remove("fake-fullscreen");
+      } else {
+        try {
+          await camsGrid.requestFullscreen();
+        } catch {
+          // Fallback : pseudo-fullscreen via CSS
+          camsGrid.classList.add("fake-fullscreen");
+        }
+      }
+    });
+  }
+
+  // ESC sort du fake-fullscreen
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && camsGrid && camsGrid.classList.contains("fake-fullscreen")) {
+      camsGrid.classList.remove("fake-fullscreen");
+    }
   });
 
-  // ── Enregistrement caméra ──
+  // Charge la liste des caméras et construit la grille
+  async function loadCameras() {
+    try {
+      const r = await api("/api/cam/list", { method: "GET" });
+      if (r && r.cameras) {
+        camsList = r.cameras;
+        renderCamsGrid();
+      }
+    } catch (e) {
+      console.error("Erreur chargement caméras:", e);
+      if (camsGrid) {
+        camsGrid.innerHTML = `<div style="grid-column:1/-1;color:#fff;padding:20px;text-align:center;">
+          Impossible de charger les caméras : ${e.message}
+        </div>`;
+      }
+    }
+  }
+
+  // ── Enregistrement caméra (bandeau global de statut) ──
+  //
+  // Les boutons start/stop sont maintenant par tuile (voir renderCamsGrid).
+  // Ici on gère juste le bandeau global recStatus qui affiche s'il y a un
+  // enregistrement en cours sur n'importe quelle cam (priorité à la cam d'alarme).
 
   function formatRecTime(seconds) {
     const m = String(Math.floor(seconds / 60)).padStart(2, "0");
@@ -1073,74 +1257,60 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${m}:${s}`;
   }
 
-  function startRecUI() {
-    if (btnRecStart) btnRecStart.classList.add("hidden");
-    if (btnRecStop) btnRecStop.classList.remove("hidden");
-    if (recStatus) recStatus.classList.remove("hidden");
-    let elapsed = 0;
-    if (recTimer) recTimer.textContent = "00:00";
+  function showRecBanner(elapsedSeconds, label) {
+    if (!recStatus) return;
+    recStatus.classList.remove("hidden");
+    if (recStatusText) recStatusText.textContent = label || "Enregistrement en cours…";
+    if (recTimerInterval) { clearInterval(recTimerInterval); recTimerInterval = null; }
+    let elapsed = elapsedSeconds || 0;
+    if (recTimer) recTimer.textContent = formatRecTime(elapsed);
     recTimerInterval = setInterval(() => {
       elapsed++;
       if (recTimer) recTimer.textContent = formatRecTime(elapsed);
     }, 1000);
   }
 
-  function stopRecUI() {
-    if (btnRecStart) btnRecStart.classList.remove("hidden");
-    if (btnRecStop) btnRecStop.classList.add("hidden");
+  function hideRecBanner() {
     if (recStatus) recStatus.classList.add("hidden");
     if (recTimerInterval) { clearInterval(recTimerInterval); recTimerInterval = null; }
   }
 
-  if (btnRecStart) {
-    btnRecStart.addEventListener("click", async () => {
-      try {
-        btnRecStart.disabled = true;
-        const r = await api("/api/cam/record/start", { method: "POST", json: true, body: "{}" });
-        if (!r || !r.ok) throw new Error(r?.error || "Erreur enregistrement");
-        startRecUI();
-        showToast("Enregistrement démarré");
-      } catch (e) {
-        setHint("Erreur enregistrement : " + (e.message || e), true);
-      } finally {
-        btnRecStart.disabled = false;
+  // Sync UI des tuiles : afficher Stop sur les cams qui enregistrent
+  function syncTileRecButtons(byCam) {
+    Object.entries(camPlayers).forEach(([camId, p]) => {
+      if (!p.tile) return;
+      const btnStart = p.tile.querySelector('[data-action="rec-start"]');
+      const btnStop = p.tile.querySelector('[data-action="rec-stop"]');
+      if (!btnStart || !btnStop) return;
+      if (byCam && byCam[camId] && byCam[camId].recording) {
+        btnStart.classList.add("hidden");
+        btnStop.classList.remove("hidden");
+      } else {
+        btnStart.classList.remove("hidden");
+        btnStop.classList.add("hidden");
       }
     });
   }
 
-  if (btnRecStop) {
-    btnRecStop.addEventListener("click", async () => {
-      try {
-        btnRecStop.disabled = true;
-        const r = await api("/api/cam/record/stop", { method: "POST", json: true, body: "{}" });
-        if (!r || !r.ok) throw new Error(r?.error || "Erreur arrêt");
-        stopRecUI();
-        showToast(`Enregistrement sauvegardé (${r.duration_seconds}s)`);
-      } catch (e) {
-        setHint("Erreur arrêt : " + (e.message || e), true);
-      } finally {
-        btnRecStop.disabled = false;
-      }
-    });
-  }
-
-  // Vérifier si un enregistrement est déjà en cours au chargement
-  (async () => {
+  // Vérifier l'état d'enregistrement périodiquement
+  async function refreshRecStatus() {
     try {
       const r = await api("/api/cam/record/status", { method: "GET" });
-      if (r && r.recording) {
-        startRecUI();
-        // Synchroniser le timer avec le temps réel
-        if (recTimerInterval) clearInterval(recTimerInterval);
-        let elapsed = r.elapsed_seconds || 0;
-        if (recTimer) recTimer.textContent = formatRecTime(elapsed);
-        recTimerInterval = setInterval(() => {
-          elapsed++;
-          if (recTimer) recTimer.textContent = formatRecTime(elapsed);
-        }, 1000);
+      if (!r) return;
+      syncTileRecButtons(r.by_cam || {});
+
+      // Bandeau global : on affiche s'il y a au moins 1 enregistrement
+      const camsRecording = Object.entries(r.by_cam || {});
+      if (camsRecording.length > 0) {
+        const [firstCamId, firstState] = camsRecording[0];
+        const camName = camPlayers[firstCamId]?.name || firstCamId;
+        const extra = camsRecording.length > 1 ? ` (+${camsRecording.length - 1})` : "";
+        showRecBanner(firstState.elapsed_seconds, `Enregistrement : ${camName}${extra}`);
+      } else {
+        hideRecBanner();
       }
     } catch {}
-  })();
+  }
 
   // ── Gestion des rôles (admin/user) ──
   if (!isAdmin) {
@@ -1157,21 +1327,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Masquer la bannière alarme et les éléments admin dans la topbar
     if (alarmBanner) alarmBanner.style.display = "none";
-
-    // Masquer les boutons d'enregistrement sur la caméra
-    if (btnRecStart) btnRecStart.style.display = "none";
-    if (btnRecStop) btnRecStop.style.display = "none";
+    // (Les boutons d'enregistrement par tuile sont masqués individuellement
+    //  via le check isAdmin dans renderCamsGrid)
 
     // Changer le sous-titre
     if (systemSubtitle) systemSubtitle.textContent = "Mode visualisation";
   }
 
   // ── Init ──
+  // Les caméras sont chargées pour tout le monde (admin + user normal)
+  loadCameras().catch(e => console.error("loadCameras:", e));
+
   if (isAdmin) {
     loadAll().catch(e => setHint(e.message, true));
     startDIPolling();
+    // Polling du statut d'enregistrement toutes les 3s (admin only)
+    refreshRecStatus();
+    setInterval(refreshRecStatus, 3000);
   } else {
-    // User normal : charger juste le minimum (pas de polling DI, pas de loadAll)
     if (systemSubtitle) systemSubtitle.textContent = `Connecté — Mode visualisation`;
   }
 });

@@ -11,6 +11,8 @@ const corsOptions = {
     "http://172.29.19.193:3000",
     "http://172.29.19.193:3001",
     "http://172.29.19.193:3002",
+    "https://alarme.geofight.fr",
+    "http://alarme.geofight.fr",
   ],
   methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
   allowedHeaders: "Origin, X-Requested-With, Content-Type, Accept, Authorization",
@@ -19,7 +21,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
-const BACKEND_URL = process.env.BACKEND_URL || "http://172.29.19.193:3001";
+const BACKEND_URL = process.env.BACKEND_URL || "http://172.29.19.193:80";
 const PORT = Number(process.env.PORT || 3002);
 
 // Proxy pour l'inscription

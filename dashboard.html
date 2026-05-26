@@ -118,27 +118,21 @@
         </div>
       </div>
 
-      <!-- CAMÉRA (DANS LA GRID, PAS EN DEHORS) -->
-      <div class="card wide">
-        <h2>Caméra (Dahua)</h2>
+      <!-- CAMÉRAS (GRILLE MULTI-CAM) -->
+      <div class="card wide" id="cardCameras">
+        <div class="card-header">
+          <h2>Caméras de surveillance</h2>
+          <div class="cams-toolbar">
+            <button class="btn btn-ghost small-btn" id="btnCamsQuality" data-quality="sub">Qualité : Sous-flux</button>
+            <button class="btn btn-ghost small-btn" id="btnCamsFullscreen">⛶ Plein écran</button>
+          </div>
+        </div>
         <p class="muted">
-          Flux live via le serveur (identifiants caméra jamais exposés au navigateur).
+          Clique sur une caméra pour l'agrandir. Les 4 flux jouent en parallèle (sous-flux par défaut).
         </p>
 
-        <div class="cam-wrap">
-          <video id="camVideo" autoplay playsinline muted controls></video>
-
-          <div class="cam-overlay" id="camOverlay">
-            <div class="cam-status" id="camStatus">Caméra prête</div>
-            <div class="cam-actions">
-              <button class="btn" id="btnCamStart">Afficher</button>
-              <button class="btn btn-ghost" id="btnCamStop">Couper</button>
-              <button class="btn btn-ghost" id="btnCamSub">Sous-flux</button>
-              <button class="btn btn-ghost" id="btnCamMain">Flux principal</button>
-              <button class="btn btn-rec" id="btnRecStart">⏺ Enregistrer</button>
-              <button class="btn btn-rec-stop hidden" id="btnRecStop">⏹ Arrêter</button>
-            </div>
-          </div>
+        <div class="cams-grid" id="camsGrid">
+          <!-- Les tuiles caméra sont injectées par dashboard.js -->
         </div>
 
         <div id="recStatus" class="rec-status hidden">
@@ -148,7 +142,7 @@
         </div>
 
         <p class="hint muted">
-          Le flux principal est décalé dû au fait qu'il est plus lourd. Le sous-flux est plus léger donc il y a quasiment aucune latence.
+          Astuce : le flux principal est plus lourd et latent. Le sous-flux est quasi temps réel et économise le réseau.
         </p>
       </div>
 
@@ -186,10 +180,6 @@
           </div>
           <div id="badgeList" class="t-body"></div>
         </div>
-
-        <p class="hint muted">
-          Astuce : pour un dashboard fluide, garde le sous-flux caméra et limite la résolution si besoin.
-        </p>
       </div>
 
       <!-- CAPTEURS DI (PET-7050) -->
