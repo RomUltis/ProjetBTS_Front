@@ -29,12 +29,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnAddSlot = document.getElementById("btnAddSlot");
   const btnSaveSchedule = document.getElementById("btnSaveSchedule");
 
+  const rfidSection = document.getElementById("rfidSection");
   const rfidUid = document.getElementById("rfidUid");
   const rfidOwner = document.getElementById("rfidOwner");
   const btnAddBadge = document.getElementById("btnAddBadge");
   const btnEnrollRfid = document.getElementById("btnEnrollRfid");
   const enrollCountdown = document.getElementById("enrollCountdown");
   const badgeList = document.getElementById("badgeList");
+
+  // Feature flag RFID — masque la section si RFID_ENABLED=false côté serveur
+  fetch("/api/features")
+    .then(r => r.json())
+    .then(f => { if (!f.rfidEnabled) rfidSection.style.display = "none"; })
+    .catch(() => {});
 
   const toast = document.getElementById("toast");
 
@@ -1015,6 +1022,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let activeCamId = null;
 
   function buildHlsPlayer(video, url) {
+    // RGPD : ajouter le token JWT à toutes les requêtes HLS.
+    // Le backend protège /cam/* avec requireAuthFlexible (token dans header OU query).
+    const token = localStorage.getItem("token") || "";
+
     if (window.Hls && Hls.isSupported()) {
       const hls = new Hls({
         lowLatencyMode: true,
@@ -1024,6 +1035,10 @@ document.addEventListener("DOMContentLoaded", () => {
         maxMaxBufferLength: 2,
         backBufferLength: 0,
         enableWorker: true,
+        // Injecter Authorization Bearer dans chaque requête HLS (.m3u8, .ts, .m4s)
+        xhrSetup: (xhr) => {
+          if (token) xhr.setRequestHeader("Authorization", "Bearer " + token);
+        },
       });
       hls.loadSource(url);
       hls.attachMedia(video);
@@ -1031,17 +1046,26 @@ document.addEventListener("DOMContentLoaded", () => {
         video.play().catch(() => {});
       });
       hls.on(Hls.Events.ERROR, (_evt, data) => {
-        if (data.fatal) {
-          // Retry après 3s
-          setTimeout(() => {
-            try { hls.loadSource(url); } catch {}
-          }, 3000);
+        if (!data.fatal) return;
+
+        // RGPD : détecter le refus du serveur (403 = alarme désarmée)
+        const status = data.response && data.response.code;
+        if (status === 403) {
+          // On marque la tuile comme RGPD-désactivée (handle dans renderCamsGrid)
+          if (video._rgpdHandler) video._rgpdHandler();
+          return; // ne PAS retry, c'est volontaire
         }
+
+        // Sinon retry après 3s
+        setTimeout(() => {
+          try { hls.loadSource(url); } catch {}
+        }, 3000);
       });
       return hls;
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Safari natif
-      video.src = url;
+      // Safari natif : impossible de set un header, donc on passe le token en query
+      const sep = url.includes("?") ? "&" : "?";
+      video.src = url + (token ? sep + "token=" + encodeURIComponent(token) : "");
       video.play().catch(() => {});
       return null;
     }
@@ -1089,19 +1113,43 @@ document.addEventListener("DOMContentLoaded", () => {
       const statusEl = tile.querySelector("[data-status]");
       const url = currentQuality === "main" ? cam.hls_main : cam.hls_sub;
 
+      // RGPD : handler appelé quand le backend renvoie 403 (alarme désarmée).
+      // Affiche un overlay explicatif sur la tuile pour éviter que l'utilisateur
+      // pense à un bug et insiste avec des refresh.
+      video._rgpdHandler = () => {
+        statusEl.textContent = "🛡 RGPD";
+        statusEl.className = "cam-tile-status rgpd";
+        // Ajoute un overlay si pas déjà fait
+        if (!tile.querySelector(".cam-tile-rgpd-overlay")) {
+          const overlay = document.createElement("div");
+          overlay.className = "cam-tile-rgpd-overlay";
+          overlay.innerHTML = `
+            <div class="rgpd-icon">🛡</div>
+            <div class="rgpd-title">Caméra désactivée</div>
+            <div class="rgpd-text">Activation lors de l'armement de l'alarme<br><small>Conformité RGPD — art. 5.1.c</small></div>
+          `;
+          tile.appendChild(overlay);
+        }
+      };
+
       const hls = buildHlsPlayer(video, url);
       camPlayers[cam.id] = { hls, video, name: cam.name, statusEl, tile };
 
-      // Statut basique : si le video joue, on passe en "ok"
+      // Statut basique : si le video joue, on passe en "ok" (et on retire l'overlay RGPD si présent)
       video.addEventListener("playing", () => {
         statusEl.textContent = "LIVE";
         statusEl.className = "cam-tile-status ok";
+        const overlay = tile.querySelector(".cam-tile-rgpd-overlay");
+        if (overlay) overlay.remove();
       });
       video.addEventListener("error", () => {
+        // Ne pas écraser le statut RGPD si déjà affiché
+        if (statusEl.classList.contains("rgpd")) return;
         statusEl.textContent = "ERR";
         statusEl.className = "cam-tile-status error";
       });
       video.addEventListener("stalled", () => {
+        if (statusEl.classList.contains("rgpd")) return;
         statusEl.textContent = "…";
         statusEl.className = "cam-tile-status";
       });
