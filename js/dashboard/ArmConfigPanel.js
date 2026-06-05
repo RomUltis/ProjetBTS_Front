@@ -11,6 +11,15 @@ export class ArmConfigPanel {
     this.doExclusionList = document.getElementById("doExclusionList");
     this.sirenDurationInput = document.getElementById("sirenDurationInput");
     this.btnSaveArmConfig = document.getElementById("btnSaveArmConfig");
+    this.armConfigSection = document.getElementById("armConfigSection");
+  }
+
+  // Feature flag — masque la section si ARM_CONFIG_ENABLED=false côté serveur
+  applyFeatureFlag() {
+    fetch("/api/features")
+      .then((r) => r.json())
+      .then((f) => { if (!f.armConfigEnabled && this.armConfigSection) this.armConfigSection.style.display = "none"; })
+      .catch(() => {});
   }
 
   render() {

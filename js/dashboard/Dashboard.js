@@ -205,8 +205,9 @@ export class Dashboard {
       return;
     }
 
-    // Feature flag RFID — masque la section si désactivée côté serveur
+    // Feature flags — masquent les sections désactivées côté serveur
     this.badgePanel.applyFeatureFlag();
+    this.armConfigPanel.applyFeatureFlag();
 
     // Events globaux
     this.el.btnLogout.addEventListener("click", () => {

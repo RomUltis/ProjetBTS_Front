@@ -46,11 +46,27 @@ export class SchedulePanel {
       });
     });
     this.slotList.querySelectorAll("button[data-del]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const idx = Number(btn.getAttribute("data-del"));
         this.slots.splice(idx, 1);
         this.render();
+        // Persiste TOUT DE SUITE (sinon la plage réapparaît au rechargement)
+        try {
+          await this._persist();
+          this.dash.showToast("Plage supprimée");
+          await this.dash.loadAll();
+        } catch (e) {
+          this.dash.setHint("Erreur suppression : " + (e.message || e), true);
+        }
       });
+    });
+  }
+
+  // Persiste les plages en base (PUT remplace tout). Le back ignore les plages
+  // incomplètes (start/end vide) → nettoie au passage une plage "bloquée".
+  async _persist() {
+    await this.dash.api.request("/schedule", {
+      method: "PUT", json: true, body: JSON.stringify({ slots: this.slots }),
     });
   }
 
@@ -65,7 +81,7 @@ export class SchedulePanel {
 
     this.btnSaveSchedule.addEventListener("click", async () => {
       try {
-        await dash.api.request("/schedule", { method: "PUT", json: true, body: JSON.stringify({ slots: this.slots }) });
+        await this._persist();
         dash.showToast("Horaires enregistrés");
         await dash.loadAll();
       } catch (e) {
