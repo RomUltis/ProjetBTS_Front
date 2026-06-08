@@ -14,6 +14,7 @@ export class DiPanel {
     this.diEventList = document.getElementById("diEventList");
     this.btnRefreshDI = document.getElementById("btnRefreshDI");
     this.btnLoadEvents = document.getElementById("btnLoadEvents");
+    this.showZoneBadge = true; // badges "Armée/Exclue" — masqués si la config d'armement est désactivée
   }
 
   setInputs(inputs) { this.diInputs = inputs; }
@@ -56,11 +57,14 @@ export class DiPanel {
       group.className = "di-zone-group";
 
       const isZoneArmed = this.dash.alarmConfig.armed_zones.includes(zoneKey);
+      const zoneBadge = this.showZoneBadge
+        ? `<span class="badge ${isZoneArmed ? 'on' : 'off'}">${isZoneArmed ? 'Armée' : 'Exclue'}</span>`
+        : "";
 
       group.innerHTML = `
         <div class="di-zone-header">
           <span class="di-zone-name">${escapeHtml(zoneName)}</span>
-          <span class="badge ${isZoneArmed ? 'on' : 'off'}">${isZoneArmed ? 'Armée' : 'Exclue'}</span>
+          ${zoneBadge}
         </div>
       `;
 
@@ -125,6 +129,13 @@ export class DiPanel {
 
   bind() {
     const dash = this.dash;
+
+    // Les badges "Armée/Exclue" font partie de la config d'armement : on les
+    // masque si ARM_CONFIG_ENABLED=false (même flag que la carte de configuration).
+    fetch("/api/features")
+      .then((r) => r.json())
+      .then((f) => { this.showZoneBadge = f.armConfigEnabled !== false; this.render(); })
+      .catch(() => {});
 
     if (this.btnRefreshDI) {
       this.btnRefreshDI.addEventListener("click", async () => {
